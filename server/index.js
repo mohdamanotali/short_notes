@@ -46,8 +46,8 @@ app.post('/api/create', (req, res) => {
     }
 });
 
-app.put('/api/update', (req, res) => {
-    const _id = req.body.id;
+app.put('/api/update/:id', (req, res) => {
+    const _id = req.params.id;
     const _title = req.body.title;
     const _description = req.body.description;
     const _color = req.body.color;
@@ -63,16 +63,15 @@ app.put('/api/update', (req, res) => {
     }
 });
 
-app.delete('/api/delete/:id/:status', (req, res) => {
+app.delete('/api/delete/:id', (req, res) => {
     const _id = req.params.id;
-    const _status = req.params.status;
-    const _stature = _status==1 ? _status : 0;
+    const _status = req.body.status;
 
     if (_id) {
         const _delete = "UPDATE notes SET status = ? WHERE id = ?";
-        db.query(_delete, [_stature, _id], (error, results, fields) => {
+        db.query(_delete, [_status, _id], (error, results, fields) => {
             if (error) res.send(error);
-            else res.send({status: 200, message: _stature==1 ? 'Note is recovered' : 'Note is deleted'});
+            else res.send({status: 200, message: _status==1 ? 'Note is recovered' : 'Note is deleted'});
         });
     } else {
         res.send({status: 400, message: 'Invalid input(s)'});

@@ -3,6 +3,7 @@ import Axios from 'axios';
 import './App.css';
 
 function App() {
+    const baseUrl = 'http://localhost:3001/api';
     const [id, setId] = useState('');
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
@@ -10,31 +11,39 @@ function App() {
     const [label, setLabel] = useState('SAVE');
     const [notes, setNotes] = useState([]);
     const [flag, setFlag] = useState(false);
-    const [alert, setAlert] = useState(false);
+    const [undo, setUndo] = useState(false);
     const [xid, setXid] = useState('');
+    const [alert, setAlert] = useState('');
 
     useEffect(() => {
-        Axios.get('http://localhost:3001/api/read')
-        .then((response) => {
-            setNotes(response.data.records);
-        });
+        async function readData() {
+            await Axios.get(baseUrl+'/read')
+            .then((response) => {
+                setNotes(response.data.records);
+            });
+        }
+        readData();
     }, [flag]);
 
-    const submitForm = () => {
+    const submitForm = async () => {
+        const _params = {title: title, description: description, color: color};
+        let _message = '';
         if (id) {
-            Axios.put('http://localhost:3001/api/update', {id: id, title: title, description: description, color: color})
+            await Axios.put(baseUrl+'/update/'+id, _params)
             .then((response) => {
-                console.log(response.data);
-                clearForm();
-                setFlag(!flag);
+                _message = (response.data.message !== undefined) ? response.data.message : _message;
             });
         } else {
-            Axios.post('http://localhost:3001/api/create', {title: title, description: description, color: color})
+            await Axios.post(baseUrl+'/create', _params)
             .then((response) => {
-                console.log(response.data);
-                clearForm();
-                setFlag(!flag);
+                _message = (response.data.message !== undefined) ? response.data.message : _message;
             });
+        }
+        if (_message !== '') {
+            resetState();
+            setAlert(_message);
+            setFlag(!flag);
+            setTimer(3);
         }
     };
 
@@ -47,39 +56,48 @@ function App() {
         window.scrollTo({top: 0, behavior: 'smooth'});
     };
 
-    const deleteForm = (_id) => {
-        setAlert(false);
-        Axios.delete('http://localhost:3001/api/delete/'+_id+'/0')
+    const deleteForm = async (_id) => {
+        await Axios.delete(baseUrl+'/delete/'+_id, {data: {status: 0}})
         .then((response) => {
-            console.log(response.data);
-            clearForm();
-            setFlag(!flag);
-            setXid(_id);
-            setAlert(true);
-            setTimeout(() => {
-                setAlert(false);
-                setXid('');
-            }, 3000);
+            if (response.data.message !== undefined && response.data.message) {
+                resetState();
+                setXid(_id);
+                setUndo(true);
+                setFlag(!flag);
+                setTimer(5);
+            }
         });
     };
 
-    const undoDelete = () => {
-        setAlert(false);
-        Axios.delete('http://localhost:3001/api/delete/'+xid+'/1')
-        .then((response) => {
-            console.log(response.data);
-            clearForm();
-            setFlag(!flag);
-            setXid('');
-        });
+    const undoDelete = async () => {
+        if (xid) {
+            await Axios.delete(baseUrl+'/delete/'+xid, {data: {status: 1}})
+            .then((response) => {
+                if (response.data.message !== undefined && response.data.message) {
+                    resetState();
+                    setAlert(response.data.message);
+                    setFlag(!flag);
+                    setTimer(3);
+                }
+            });
+        }
     };
 
-    const clearForm = () => {
+    const resetState = () => {
         setId('');
         setTitle('');
         setDescription('');
         setColor('#ffee9b');
         setLabel('SAVE');
+        setUndo(false);
+        setXid('');
+        setAlert('');
+    };
+
+    const setTimer = (_seconds) => {
+        setTimeout(() => {
+            resetState();
+        }, _seconds * 1000);
     };
 
     return (
@@ -96,7 +114,7 @@ function App() {
                         <input type="radio" name="color" value="#d5dadc" onChange={(e) => { setColor(e.target.value) }} checked={color==='#d5dadc' ? true : false} />
                     </span>
                     <span>
-                        <button style={{color: "rgba(0, 0, 0, 0.5)"}} onClick={clearForm}>CLEAR</button>
+                        <button style={{color: "rgba(0, 0, 0, 0.5)"}} onClick={resetState}>CLEAR</button>
                         <button className="submit" onClick={submitForm}>{label}</button>
                     </span>
                 </div>
@@ -116,7 +134,10 @@ function App() {
                     </div>
                 );
             })}
-            <div id="alert" style={alert ? {} : {display: 'none'}}>
+            <div className="alert" style={alert ? {} : {display: 'none'}}>
+                <p>{alert}</p>
+            </div>
+            <div className="alert" style={undo ? {} : {display: 'none'}}>
                 <span>Undo delete</span>
                 <button onClick={undoDelete}>UNDO</button>
             </div>
